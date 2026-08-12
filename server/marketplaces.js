@@ -160,7 +160,53 @@ export function normalizeDmarketOffers(offers) {
   return [...new Map(normalized.map((item) => [item.offerId || `${item.marketHashName}:${item.minPrice}`, item])).values()];
 }
 
-export async function fetchDmarketOffers({ publicKey, secretKey, pagesPerRange = 3 }) {
+async function fetchDmarketWebsiteOffers({ pagesPerRange }) {
+  const all = [];
+  const ranges = [
+    [0, 99],
+    [100, 999],
+    [1_000, 9_999],
+    [10_000, 99_999],
+    [100_000, 10_000_000],
+  ];
+  let requestCount = 0;
+
+  for (const [priceFrom, priceTo] of ranges) {
+    let pageToken = '';
+    for (let page = 0; page < pagesPerRange; page += 1) {
+      const params = new URLSearchParams({
+        side: 'dmarketOffers',
+        currency: 'USD',
+        platform: 'browser',
+        gameId: 'a8db',
+        pageSize: '100',
+        isLoggedIn: 'false',
+        priceFrom: String(priceFrom),
+        priceTo: String(priceTo),
+        orderBy: 'price',
+        orderDir: 'asc',
+      });
+      if (pageToken) params.set('pageToken', pageToken);
+
+      // DMarket limits unauthenticated market-item requests to 2 per second.
+      if (requestCount > 0) await new Promise((resolve) => setTimeout(resolve, 550));
+      requestCount += 1;
+
+      const data = await fetchJson(
+        `https://api.dmarket.com/exchange/v1/market/items/v2?${params}`,
+      );
+
+      const offers = data.offers || [];
+      all.push(...offers);
+      pageToken = data.pageToken || '';
+      if (!pageToken || offers.length === 0) break;
+    }
+  }
+
+  return normalizeDmarketOffers(all);
+}
+
+async function fetchDmarketTradingOffers({ publicKey, secretKey, pagesPerRange }) {
   if (!publicKey || !secretKey) return [];
 
   const all = [];
@@ -203,4 +249,19 @@ export async function fetchDmarketOffers({ publicKey, secretKey, pagesPerRange =
   }
 
   return normalizeDmarketOffers(all);
+}
+
+export async function fetchDmarketOffers({ publicKey, secretKey, pagesPerRange = 3 } = {}) {
+  try {
+    return await fetchDmarketWebsiteOffers({ pagesPerRange });
+  } catch (websiteError) {
+    if (!publicKey || !secretKey) throw websiteError;
+
+    try {
+      return await fetchDmarketTradingOffers({ publicKey, secretKey, pagesPerRange });
+    } catch (tradingError) {
+      tradingError.message = `Website feed: ${websiteError.message}; Trading API: ${tradingError.message}`;
+      throw tradingError;
+    }
+  }
 }

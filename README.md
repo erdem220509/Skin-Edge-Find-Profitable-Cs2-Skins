@@ -6,7 +6,7 @@ The dashboard is a research tool. Every result links to its purchase page and se
 
 ## Features
 
-- Compare Skinport and optional DMarket purchases with CSFloat or Steam exits.
+- Compare Skinport and DMarket purchases with CSFloat or Steam exits.
 - Switch between **Gross spread** and **After deductions** calculations.
 - Sort by profit amount, profit percentage, buy price, exit price, or liquidity.
 - Reverse every sorting mode.
@@ -21,11 +21,11 @@ The dashboard is a research tool. Every result links to its purchase page and se
 | Marketplace | Role | Authentication |
 | --- | --- | --- |
 | [Skinport](https://skinport.com/market) | Purchase prices and sales history | Not required |
-| [DMarket](https://dmarket.com/ingame-items/item-list/csgo-skins) | Optional purchase listings | Trading API keys |
+| [DMarket](https://dmarket.com/ingame-items/item-list/csgo-skins) | Purchase listings | No credentials; Trading API keys are an optional fallback |
 | [CSFloat](https://csfloat.com/search) | Resale prices | Not required |
 | [Steam Community Market](https://steamcommunity.com/market/search?appid=730) | Sampled resale prices | Not required |
 
-Marketplace coverage is not guaranteed to include every listing. Steam results are sampled across several price ranges. DMarket coverage depends on valid API credentials and the configured page limit.
+Marketplace coverage is not guaranteed to include every listing. Steam and DMarket results are sampled across several price ranges and their configured page limits.
 
 ## Profit calculations
 
@@ -75,9 +75,9 @@ cd skin_price_catcher
 npm install
 ```
 
-Skinport, CSFloat, and Steam work without credentials. DMarket is optional.
+Skinport, CSFloat, Steam, and DMarket purchase listings work without credentials.
 
-To configure DMarket, create a local environment file:
+To change the DMarket sampling limit or configure signed API fallback credentials, create a local environment file:
 
 ```bash
 cp .env.example .env
@@ -89,7 +89,7 @@ Windows PowerShell:
 Copy-Item .env.example .env
 ```
 
-Add a key pair generated in DMarket account settings:
+Trading API keys are optional. When supplied, they are only used if DMarket's read-only website feed is unavailable:
 
 ```dotenv
 DMARKET_PUBLIC_KEY=your_dmarket_public_key
@@ -121,8 +121,8 @@ Then open `http://127.0.0.1:8787`.
 
 | Variable | Default | Purpose |
 | --- | ---: | --- |
-| `DMARKET_PUBLIC_KEY` | Empty | DMarket Trading API public key |
-| `DMARKET_SECRET_KEY` | Empty | DMarket Trading API secret key |
+| `DMARKET_PUBLIC_KEY` | Empty | Optional DMarket Trading API fallback public key |
+| `DMARKET_SECRET_KEY` | Empty | Optional DMarket Trading API fallback secret key |
 | `DMARKET_PAGES_PER_RANGE` | `3` | DMarket pages sampled per price range |
 | `STEAM_PAGES_PER_RANGE` | `5` | Steam pages sampled per price range |
 | `MARKET_CACHE_SECONDS` | `300` | Default marketplace cache duration |
@@ -134,7 +134,7 @@ Marketplace responses are cached instead of requested for every filter or assump
 
 When Skinport returns HTTP `429`, Skin Edge follows its `Retry-After` value. Manual refresh cannot bypass an active cooldown. Provider state and record counts are shown under **Assumptions -> Data sources**.
 
-DMarket returns HTTP `401` when its keys are missing, expired, revoked, or are not from the same generated pair. Generate a new Trading API pair and update `.env` if DMarket shows **API key**.
+DMarket listings normally use its read-only website feed. If that feed is unavailable, configured Trading API keys are attempted as a fallback. A fallback `401` means the keys are expired, revoked, or otherwise rejected by DMarket.
 
 ## Accuracy and risk
 

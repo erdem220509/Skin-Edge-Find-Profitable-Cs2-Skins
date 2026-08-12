@@ -16,7 +16,7 @@ import path from 'node:path';
 
 const CACHE_MS = Number(process.env.MARKET_CACHE_SECONDS || 300) * 1000;
 const cache = new Map();
-const PERSISTENT_KEYS = new Set(['skinport', 'skinport-history']);
+const PERSISTENT_KEYS = new Set(['skinport', 'skinport-history', 'dmarket']);
 const CACHE_DIR = path.resolve('.cache');
 
 async function readPersistentCache(key) {
@@ -136,20 +136,17 @@ function buildRow({ source, item, exit, history, settings }) {
 export async function getOpportunityData(settings) {
   const dmarketPublicKey = process.env.DMARKET_PUBLIC_KEY?.trim();
   const dmarketSecretKey = process.env.DMARKET_SECRET_KEY?.trim();
-  const dmarketEnabled = Boolean(dmarketPublicKey && dmarketSecretKey);
   const [csfloat, skinport, history, dmarket, steam] = await Promise.all([
     cached('csfloat', fetchCsfloatPrices),
     cached('skinport', fetchSkinportItems),
     cached('skinport-history', fetchSkinportHistory),
-    dmarketEnabled
-      ? cached('dmarket', () =>
-          fetchDmarketOffers({
-            publicKey: dmarketPublicKey,
-            secretKey: dmarketSecretKey,
-            pagesPerRange: Number(process.env.DMARKET_PAGES_PER_RANGE || 3),
-          }),
-        )
-      : Promise.resolve({ data: [], at: null, error: null }),
+    cached('dmarket', () =>
+      fetchDmarketOffers({
+        publicKey: dmarketPublicKey,
+        secretKey: dmarketSecretKey,
+        pagesPerRange: Number(process.env.DMARKET_PAGES_PER_RANGE || 3),
+      }),
+    ),
     cached(
       'steam',
       () => fetchSteamMarketItems({ pagesPerRange: Number(process.env.STEAM_PAGES_PER_RANGE || 5) }),
@@ -170,7 +167,16 @@ export async function getOpportunityData(settings) {
     const cheapestByName = new Map();
     for (const item of items) {
       const existing = cheapestByName.get(item.marketHashName);
-      if (!existing || item.minPrice < existing.minPrice) cheapestByName.set(item.marketHashName, item);
+      if (!existing) {
+        cheapestByName.set(item.marketHashName, { ...item });
+      } else if (item.minPrice < existing.minPrice) {
+        cheapestByName.set(item.marketHashName, {
+          ...item,
+          quantity: existing.quantity + item.quantity,
+        });
+      } else {
+        existing.quantity += item.quantity;
+      }
     }
     for (const item of cheapestByName.values()) {
       const exit = exitMap.get(item.marketHashName);
@@ -198,11 +204,6 @@ export async function getOpportunityData(settings) {
       opportunities.filter((item) => item.source === source).length,
     ]),
   );
-  const dmarketAuthError = dmarket.error?.startsWith('401');
-  const dmarketError = dmarketAuthError
-    ? 'Trading API pair rejected by DMarket. Generate new keys, update .env, then restart Skin Edge.'
-    : dmarket.error;
-
   const timestamps = [csfloat.at, skinport.at, history.at, dmarket.at, steam.at].filter(Boolean);
   return {
     opportunities: returnedOpportunities,
@@ -219,7 +220,7 @@ export async function getOpportunityData(settings) {
         { id: 'csfloat', label: `CSFloat exit${settings.exitMarket === 'csfloat' ? ' (selected)' : ''}`, enabled: true, status: csfloat.error ? 'stale' : 'online', error: csfloat.error, records: csfloat.data.length, at: csfloat.at },
         { id: 'skinport', label: 'Skinport', enabled: true, status: skinport.error ? 'stale' : 'online', error: skinport.error, records: skinport.data.length, at: skinport.at },
         { id: 'skinport-history', label: 'Skinport sales', enabled: true, status: history.error ? 'stale' : 'online', error: history.error, records: history.data.length, at: history.at },
-        { id: 'dmarket', label: 'DMarket', enabled: dmarketEnabled && !dmarketAuthError, status: !dmarketEnabled || dmarketAuthError ? 'needs-key' : dmarket.error ? 'stale' : 'online', error: dmarketError, records: dmarket.data.length, at: dmarket.at },
+        { id: 'dmarket', label: 'DMarket', enabled: true, status: dmarket.error ? 'stale' : 'online', error: dmarket.error, records: dmarket.data.length, at: dmarket.at },
         { id: 'steam', label: `Steam exit${settings.exitMarket === 'steam' ? ' (selected)' : ''}`, enabled: true, status: steam.error ? 'stale' : 'online', error: steam.error, records: steam.data.length, at: steam.at },
       ],
     },

@@ -1,6 +1,6 @@
 # Skin Edge
 
-Skin Edge is a local CS2 skin opportunity scanner. It compares purchase listings from supported marketplaces with resale prices on CSFloat or the Steam Community Market, then ranks exact item matches by estimated profit or return on investment.
+Skin Edge is a real-time CS2 market opportunity engine. It compares purchase listings with resale prices, completed-sale evidence, liquidity, price stability and sales velocity, then ranks exact item matches by expected return and confidence.
 
 The dashboard is a research tool. Every result links to its purchase page and selected resale market so the listing, float, stickers, and current price can be verified before buying.
 
@@ -8,7 +8,9 @@ The dashboard is a research tool. Every result links to its purchase page and se
 
 - Compare Skinport and DMarket purchases with CSFloat or Steam exits.
 - Switch between **Gross spread** and **After deductions** calculations.
-- Sort by profit amount, profit percentage, buy price, exit price, or liquidity.
+- Rank results by a transparent **Opportunity Score** and confidence estimate.
+- Compare expected profit and ROI with optimistic current-floor economics.
+- Sort by Opportunity Score, confidence, expected economics, live-floor economics, or liquidity.
 - Reverse every sorting mode.
 - Filter by buy market, liquidity, profitability, or item name.
 - Review listing depth and recent Skinport sales activity.
@@ -28,6 +30,28 @@ The dashboard is a research tool. Every result links to its purchase page and se
 Marketplace coverage is not guaranteed to include every listing. Steam and DMarket results are sampled across several price ranges and their configured page limits.
 
 ## Profit calculations
+
+### Expected sale value
+
+The current resale floor is not treated as guaranteed. Skin Edge caps the floor with the most recent available 7-, 30-, or 90-day completed-sale median (plus a small 3% allowance). If no completed-sale median exists, the current floor receives a conservative 15% haircut.
+
+This is a transparent heuristic, not a future-price prediction. It becomes a genuine prediction system only after first-party time-series snapshots and a validated forecasting model are added.
+
+## Opportunity Score
+
+Every exact-name match receives a score from 0 to 100:
+
+| Signal | Weight | Meaning |
+| --- | ---: | --- |
+| Expected net ROI | 25% | Return at the reliability-adjusted sale value |
+| Expected profit | 15% | Absolute expected dollar profit |
+| Liquidity | 15% | Source depth, exit depth, and recent volume |
+| Price stability | 10% | Dispersion across recent ranges and medians |
+| Sales velocity | 15% | Weighted daily sales from 24h, 7d, and 30d windows |
+| Spread reliability | 15% | Floor-to-median alignment, depth, and history coverage |
+| Market safety | 5% | Inverse of estimated volatility, illiquidity, and weak evidence |
+
+Confidence is reported separately and uses only market-evidence signals: liquidity, stability, velocity, and spread reliability. The score is intentionally inspectable in the item panel.
 
 ### Gross spread
 
@@ -167,7 +191,30 @@ npm test
 npm run build
 ```
 
-Tests cover CSFloat deductions, Steam fee rounding, Wallet valuation, gross spread, item parsing, and liquidity scoring.
+Tests cover deductions, Steam fee rounding, Wallet valuation, gross spread, item parsing, liquidity, market assessment, and opportunity scoring.
+
+## Frontend structure
+
+```text
+src/
+  components/
+    AssumptionsPanel.jsx
+    Filters.jsx
+    MarketStatus.jsx
+    OpportunityCard.jsx
+    OpportunityTable.jsx
+  config/
+    opportunities.js
+  hooks/
+    useOpportunities.js
+  utils/
+    formatting.js
+  App.jsx
+```
+
+## License
+
+[MIT](LICENSE)
 
 ## Disclaimer
 

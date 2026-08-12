@@ -1,7 +1,9 @@
 import {
+  assessMarket,
   calculateOpportunity,
   parseItemName,
   roundMoney,
+  scoreOpportunity,
   scoreLiquidity,
 } from './calculations.js';
 import {
@@ -16,7 +18,7 @@ import path from 'node:path';
 
 const CACHE_MS = Number(process.env.MARKET_CACHE_SECONDS || 300) * 1000;
 const cache = new Map();
-const PERSISTENT_KEYS = new Set(['skinport', 'skinport-history', 'dmarket']);
+const PERSISTENT_KEYS = new Set(['csfloat', 'skinport', 'skinport-history', 'dmarket', 'steam']);
 const CACHE_DIR = path.resolve('.cache');
 
 async function readPersistentCache(key) {
@@ -102,6 +104,30 @@ function buildRow({ source, item, exit, history, settings }) {
     volume24h: history?.last24h?.volume,
     volume7d: history?.last7d?.volume,
   });
+  const market = assessMarket({
+    exitFloor: exit.minPrice,
+    sourceQuantity: item.quantity,
+    exitQuantity: exit.quantity,
+    history,
+    liquidityScore: liquidity.score,
+  });
+  const expectedCalculation = calculateOpportunity({
+    buyPrice: item.minPrice,
+    exitFloor: market.expectedSalePrice + 0.01,
+    exitMarket: settings.exitMarket,
+    applyDeductions: settings.applyDeductions,
+    saleFeePercent: settings.saleFeePercent,
+    cashoutFeePercent: settings.cashoutFeePercent,
+    riskBufferPercent: settings.riskBufferPercent,
+    purchaseFeePercent: settings.purchaseFeePercent,
+    steamWalletRatePercent: settings.steamWalletRatePercent,
+  });
+  const opportunity = scoreOpportunity({
+    expectedProfit: expectedCalculation.profit,
+    expectedRoi: expectedCalculation.roi,
+    liquidityScore: liquidity.score,
+    market,
+  });
   const parsed = parseItemName(item.marketHashName);
 
   return {
@@ -123,9 +149,15 @@ function buildRow({ source, item, exit, history, settings }) {
     exitQuantity: exit.quantity,
     sourceMedian: Number.isFinite(item.medianPrice) ? item.medianPrice : null,
     saleMedian24h: history?.last24h?.median ?? null,
+    saleMedian7d: history?.last7d?.median ?? null,
     saleVolume24h: history?.last24h?.volume ?? 0,
     saleVolume7d: history?.last7d?.volume ?? 0,
     liquidity,
+    market,
+    opportunity,
+    expectedSalePrice: market.expectedSalePrice,
+    expectedProfit: roundMoney(expectedCalculation.profit),
+    expectedRoi: roundMoney(expectedCalculation.roi),
     ...asMoneyFields(calculation),
     roi: roundMoney(calculation.roi),
     profitable: calculation.profit > 0,
@@ -187,7 +219,7 @@ export async function getOpportunityData(settings) {
     }
   }
 
-  opportunities.sort((a, b) => b.profit - a.profit);
+  opportunities.sort((a, b) => b.opportunity.score - a.opportunity.score);
 
   // Keep the global best rows while guaranteeing the DMarket filter can inspect
   // every sampled match even when the source has fewer listings.
@@ -197,7 +229,7 @@ export async function getOpportunityData(settings) {
   for (const item of opportunities.filter((entry) => entry.source === 'dmarket')) {
     visibleRows.set(item.id, item);
   }
-  const returnedOpportunities = [...visibleRows.values()].sort((a, b) => b.profit - a.profit);
+  const returnedOpportunities = [...visibleRows.values()].sort((a, b) => b.opportunity.score - a.opportunity.score);
   const sourceMatches = Object.fromEntries(
     ['skinport', 'dmarket'].map((source) => [
       source,
@@ -227,9 +259,16 @@ export async function getOpportunityData(settings) {
   };
 }
 
-export function clearMarketCache() {
+export async function clearMarketCache() {
   for (const [key, value] of cache) {
-    if (PERSISTENT_KEYS.has(key) || (value.retryAt && Date.now() < value.retryAt)) continue;
+    if (value.retryAt && Date.now() < value.retryAt) continue;
     cache.delete(key);
   }
+  await Promise.all(
+    [...PERSISTENT_KEYS].map((key) =>
+      fs.unlink(path.join(CACHE_DIR, `${key}.json`)).catch((error) => {
+        if (error.code !== 'ENOENT') throw error;
+      }),
+    ),
+  );
 }

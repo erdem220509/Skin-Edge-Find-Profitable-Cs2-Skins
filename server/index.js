@@ -38,8 +38,8 @@ app.get('/api/opportunities', async (request, response) => {
   }
 });
 
-app.post('/api/refresh', (_request, response) => {
-  clearMarketCache();
+app.post('/api/refresh', async (_request, response) => {
+  await clearMarketCache();
   response.status(202).json({ ok: true });
 });
 

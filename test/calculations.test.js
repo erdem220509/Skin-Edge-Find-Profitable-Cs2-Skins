@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  assessMarket,
   calculateOpportunity,
   parseItemName,
+  scoreOpportunity,
   scoreLiquidity,
   steamSellerReceivesFromBuyerPrice,
 } from '../server/calculations.js';
@@ -78,4 +80,40 @@ test('shows gross spread until deductions are enabled', () => {
   assert.equal(result.saleFee, 0);
   assert.equal(result.cashoutFee, 0);
   assert.ok(Math.abs(result.profit - 24.99) < 0.001);
+});
+
+test('caps expected sale value when the current floor is above recent sales', () => {
+  const market = assessMarket({
+    exitFloor: 102,
+    sourceQuantity: 8,
+    exitQuantity: 12,
+    liquidityScore: 70,
+    history: {
+      last24h: { median: 91, min: 89, max: 94, volume: 4 },
+      last7d: { median: 92, min: 87, max: 97, volume: 37 },
+      last30d: { median: 90, min: 83, max: 99, volume: 140 },
+      last90d: { median: 89, min: 75, max: 101, volume: 380 },
+    },
+  });
+
+  assert.equal(market.expectedSalePrice, 94.76);
+  assert.equal(market.salesVelocity.weekly, 37);
+  assert.ok(market.spreadReliability.score > 40);
+});
+
+test('opportunity score rewards reliable economics but remains bounded', () => {
+  const result = scoreOpportunity({
+    expectedProfit: 12,
+    expectedRoi: 14,
+    liquidityScore: 82,
+    market: {
+      priceStability: { score: 85 },
+      salesVelocity: { score: 80 },
+      spreadReliability: { score: 88 },
+      marketRisk: { score: 18 },
+    },
+  });
+
+  assert.ok(result.score >= 70 && result.score <= 100);
+  assert.ok(result.confidence >= 80 && result.confidence <= 100);
 });

@@ -1,7 +1,15 @@
 {
   "name": "skin-edge",
   "version": "0.1.0",
+  "description": "Real-time CS2 market opportunity engine comparing prices, fees, liquidity, sales velocity and expected ROI across Skinport, DMarket, CSFloat and Steam.",
   "private": true,
+  "license": "MIT",
+  "homepage": "https://github.com/erdem220509/Skin-Edge-Find-Profitable-Cs2-Skins#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/erdem220509/Skin-Edge-Find-Profitable-Cs2-Skins.git"
+  },
+  "keywords": ["cs2", "react", "nodejs", "express", "arbitrage", "market-data", "data-analysis"],
   "type": "module",
   "scripts": {
     "dev": "concurrently -k -n api,web -c cyan,green \"node --env-file-if-exists=.env --watch server/index.js\" \"vite\"",
@@ -10,13 +18,13 @@
     "test": "node --test"
   },
   "dependencies": {
-    "@vitejs/plugin-react": "latest",
-    "concurrently": "latest",
-    "express": "latest",
-    "lucide-react": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "tweetnacl": "latest",
-    "vite": "latest"
+    "@vitejs/plugin-react": "6.0.5",
+    "concurrently": "10.0.4",
+    "express": "5.2.1",
+    "lucide-react": "1.31.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "tweetnacl": "1.0.3",
+    "vite": "8.2.1"
   }
 }

@@ -1,0 +1,27 @@
+# Dependencies and production output
+node_modules/
+dist/
+
+# Local credentials and environment overrides
+.env
+.env.*
+!.env.example
+
+# Runtime caches and test artifacts
+.cache/
+.playwright-cli/
+output/
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor and operating-system files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
